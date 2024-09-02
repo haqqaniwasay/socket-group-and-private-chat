@@ -4,6 +4,8 @@ import {
   Box,
   Button,
   Container,
+  Grid,
+  ListItem,
   Stack,
   TextField,
   Typography,
@@ -16,15 +18,24 @@ const App = () => {
   const [socketId, setSocketId] = useState("");
   const [messages, setMessages] = useState([]);
   const [typingUser, setTypingUser] = useState({});
-  // const [isSomeoneTyping, setIsSomeoneTyping] = useState(false);
+  const [userId, setUserId] = useState("");
+  const [isUserSaved, setIsUserSaved] = useState(false);
+  const [activeUsers, setActiveUsers] = useState([]);
+  // const [selectedUser,setSelectedUser] = useState('')
 
   const socket = useMemo(() => io("http://localhost:3000"), []);
 
-  // const socket = io("http://localhost:3000");
-
   const onSubmitMessageHandler = (e) => {
     e.preventDefault();
-    socket.emit("message", { message, room });
+    // socket.emit("message", { message, room });
+    socket.emit("sendMessage", {
+      receiverId: room,
+      sender: userId,
+      message: "hi dear",
+      inbox: "123",
+      createdAt: new Date().toISOString(),
+      messageType: "txt",
+    });
     setMessage("");
   };
 
@@ -36,8 +47,12 @@ const App = () => {
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
-    // setIsTyping(true);
     socket.emit("typing", { room });
+  };
+
+  const handleAddUser = (e) => {
+    setIsUserSaved(true);
+    socket.emit("addUser", { userId });
   };
 
   useEffect(() => {
@@ -48,117 +63,143 @@ const App = () => {
     return () => clearTimeout(timeout);
   }, [message, room, socket]);
 
-  // useEffect(() => {
-  //   if (isTyping) {
-  //     const timeout = setTimeout(() => {
-  //       setIsTyping(false);
-  //       socket.emit("stop_typing", { room });
-  //     }, 5000);
-
-  //     return () => clearTimeout(timeout);
-  //   }
-  // }, [isTyping, room, socket]);
-  // console.log("🚀 ~ App ~ isTyping:", isTyping);
-
   useEffect(() => {
-    // WHEN USER CONNECTED THIS IS WHERE EVENT IS RECIEVED
     socket.on("connect", () => {
       console.log("Connected", socket.id);
       setSocketId(socket.id);
     });
 
-    // WELCOME MSG IS RECIEVED FROM USER UPON CONNECTING
     socket.on("welcome", (msg) => {
       console.log("Message recieved:", msg);
     });
 
-    // IF ANY OTHER USER JOIN THIS IS WHERE MSG IS RECIEVED
-    socket.on("user_joined", (msg) => {
-      console.log(msg);
+    socket.on("users-refreshed", (payload) => {
+      console.log("USERS ARRAY", payload);
+      setActiveUsers(payload.users);
     });
 
-    // IF ANY OTHER USER MESSAGES, THIS IS WHERE MSG IS RECIEVED
     socket.on("message-recieved", (msg) => {
       console.log("Message recieved", msg);
       setMessages((prev) => [msg.message, ...prev]);
     });
 
-    // IF ANY OTHER USER IS TYPING, THIS IS WHERE MSG IS RECIEVED
     socket.on("isTyping", (data) => {
-      console.log("Message recieved", data);
-      // setIsSomeoneTyping(data.isTyping);
+      console.log("isTyping recieved", data);
       setTypingUser({ socketId: data.socketId, isTyping: data.isTyping });
     });
 
-    // UPON UNMOUNTING
     return () => {
       console.log("UNMOUNTING....");
-      // DISCONNECT SOCKET
       socket.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <Container maxWidth="sm">
-      {/* <Typography variant="h1" component="div" gutterBottom>
-        Welcome to Socket.io
-      </Typography> */}
-      <Box sx={{ height: 300 }} />
-      <Typography variant="h6" component="div" gutterBottom>
-        {socketId}
-      </Typography>
-
-      <form onSubmit={onSubmitRoomNameHandler}>
-        <h5>Join room</h5>
-        <TextField
-          value={roomName}
-          onChange={(e) => setRoomName(e.target.value)}
-          id="outlined-basic"
-          label="Room Name"
-          variant="outlined"
-        />
-        <Button type="submit" variant="contained" color="primary">
-          Join
-        </Button>
-      </form>
-
-      <form onSubmit={onSubmitMessageHandler}>
-        <TextField
-          value={message}
-          // onChange={(e) => setMessage(e.target.value)}
-          onChange={handleTyping}
-          id="outlined-basic"
-          label="Message"
-          variant="outlined"
-        />
-        <TextField
-          value={room}
-          onChange={(e) => setRoom(e.target.value)}
-          id="outlined-basic"
-          label="Room"
-          variant="outlined"
-        />
-        <Button type="submit" variant="contained" color="primary">
-          Send
-        </Button>
-      </form>
-
-      <Stack>
-        {typingUser.isTyping && (
-          <Typography variant="h6" component="div" gutterBottom>
-            {typingUser.socketId} is typing...
-          </Typography>
-        )}
-        {messages?.map((m, i) => {
-          return (
-            <Typography key={i} variant="h6" component="div" gutterBottom>
-              {m}
+    <div>
+      <Grid container spacing={2}>
+        <Grid item xs={4}>
+          <Container style={{ height: "100vh" }}>
+            <Typography variant="h6" component="div" gutterBottom>
+              USERS ACTIVE
             </Typography>
-          );
-        })}
-      </Stack>
-    </Container>
+
+            {activeUsers?.map((u, i) => {
+              return (
+                <Typography
+                  onClick={(e) => setRoom(e.target.textContent)}
+                  variant="h6"
+                  key={i}
+                  component="div"
+                  gutterBottom
+                  style={{
+                    color: room === u.userId ? "green" : "black",
+                  }}
+                >
+                  {u.userId}
+                </Typography>
+              );
+            })}
+          </Container>
+        </Grid>
+        <Grid item xs={8}>
+          <Container maxWidth="lg">
+            {/* <Box sx={{ height: 100 }} /> */}
+            <Typography variant="h6" component="div" gutterBottom>
+              {socketId}
+            </Typography>
+            <Box sx={{ height: 100 }} />
+
+            <form onSubmit={onSubmitRoomNameHandler}>
+              <h5>Join room</h5>
+              <TextField
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value)}
+                id="outlined-basic"
+                label="Room Name"
+                variant="outlined"
+              />
+              <Button type="submit" variant="contained" color="primary">
+                Join
+              </Button>
+            </form>
+            {!isUserSaved ? (
+              <form onSubmit={handleAddUser}>
+                <h5>Add UserId</h5>
+                <TextField
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  id="outlined-basic"
+                  label="User Id"
+                  variant="outlined"
+                />
+                <Button type="submit" variant="contained" color="primary">
+                  ADD
+                </Button>
+              </form>
+            ) : (
+              <Typography variant="h6" component="div" gutterBottom>
+                User ID: {userId}
+              </Typography>
+            )}
+
+            <form onSubmit={onSubmitMessageHandler}>
+              <TextField
+                value={message}
+                onChange={handleTyping}
+                id="outlined-basic"
+                label="Message"
+                variant="outlined"
+              />
+              <TextField
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
+                id="outlined-basic"
+                label="Room"
+                variant="outlined"
+              />
+              <Button type="submit" variant="contained" color="primary">
+                Send
+              </Button>
+            </form>
+
+            <Stack>
+              {typingUser.isTyping && (
+                <Typography variant="h6" component="div" gutterBottom>
+                  {typingUser.socketId} is typing...
+                </Typography>
+              )}
+              {messages?.map((m, i) => {
+                return (
+                  <Typography key={i} variant="h6" component="div" gutterBottom>
+                    {m}
+                  </Typography>
+                );
+              })}
+            </Stack>
+          </Container>
+        </Grid>
+      </Grid>
+    </div>
   );
 };
 
